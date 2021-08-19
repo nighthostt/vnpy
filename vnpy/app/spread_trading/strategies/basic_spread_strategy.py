@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from vnpy.app.spread_trading import (
     SpreadStrategyTemplate,
     SpreadAlgoTemplate,
@@ -19,8 +21,11 @@ class BasicSpreadStrategy(SpreadStrategyTemplate):
     max_pos = 0.0
     payup = 10
     interval = 5
+    start_time = "9:00:00"
+    end_time = "15:00:00"
 
     spread_pos = 0.0
+    update_time = None
     buy_algoid = ""
     sell_algoid = ""
     short_algoid = ""
@@ -37,6 +42,7 @@ class BasicSpreadStrategy(SpreadStrategyTemplate):
     ]
     variables = [
         "spread_pos",
+        "update_time",
         "buy_algoid",
         "sell_algoid",
         "short_algoid",
@@ -54,6 +60,9 @@ class BasicSpreadStrategy(SpreadStrategyTemplate):
         super().__init__(
             strategy_engine, strategy_name, spread, setting
         )
+
+        self.start_t = datetime.strptime(self.start_time, "%H:%M:%S").time()
+        self.end_t = datetime.strptime(self.end_time, "%H:%M:%S").time()
 
     def on_init(self):
         """
@@ -73,6 +82,7 @@ class BasicSpreadStrategy(SpreadStrategyTemplate):
         """
         self.write_log("策略停止")
 
+        self.update_time = None
         self.buy_algoid = ""
         self.sell_algoid = ""
         self.short_algoid = ""
@@ -83,10 +93,20 @@ class BasicSpreadStrategy(SpreadStrategyTemplate):
         """
         Callback when spread price is updated.
         """
+        # Trading is only allowed within given start/end time range
+        self.update_time = self.spread.datetime.time()
+        if self.update_time < self.start_t or self.update_time >= self.end_t:
+            self.stop_open_algos()
+            self.stop_close_algos()
+            self.put_event()
+            return
+
         self.spread_pos = self.get_spread_pos()
 
         # No position
         if not self.spread_pos:
+            self.stop_close_algos()
+
             # Start open algos
             if not self.buy_algoid:
                 self.buy_algoid = self.start_long_algo(
@@ -98,37 +118,26 @@ class BasicSpreadStrategy(SpreadStrategyTemplate):
                     self.short_price, self.max_pos, self.payup, self.interval
                 )
 
-            # Stop close algos
-            if self.sell_algoid:
-                self.stop_algo(self.sell_algoid)
-
-            if self.cover_algoid:
-                self.stop_algo(self.cover_algoid)
-
         # Long position
         elif self.spread_pos > 0:
+            self.stop_open_algos()
+
             # Start sell close algo
             if not self.sell_algoid:
                 self.sell_algoid = self.start_short_algo(
                     self.sell_price, self.spread_pos, self.payup, self.interval
                 )
 
-            # Stop buy open algo
-            if self.buy_algoid:
-                self.stop_algo(self.buy_algoid)
-
         # Short position
         elif self.spread_pos < 0:
+            self.stop_open_algos()
+
             # Start cover close algo
             if not self.cover_algoid:
                 self.cover_algoid = self.start_long_algo(
                     self.cover_price, abs(
                         self.spread_pos), self.payup, self.interval
                 )
-
-            # Stop short open algo
-            if self.short_algoid:
-                self.stop_algo(self.short_algoid)
 
         self.put_event()
 
@@ -166,3 +175,19 @@ class BasicSpreadStrategy(SpreadStrategyTemplate):
         Callback when new trade data is received.
         """
         pass
+
+    def stop_open_algos(self):
+        """"""
+        if self.buy_algoid:
+            self.stop_algo(self.buy_algoid)
+
+        if self.short_algoid:
+            self.stop_algo(self.short_algoid)
+
+    def stop_close_algos(self):
+        """"""
+        if self.sell_algoid:
+            self.stop_algo(self.sell_algoid)
+
+        if self.cover_algoid:
+            self.stop_algo(self.cover_algoid)

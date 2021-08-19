@@ -4,7 +4,7 @@ Widget for spread trading.
 
 from vnpy.event import EventEngine, Event
 from vnpy.trader.engine import MainEngine
-from vnpy.trader.constant import Direction
+from vnpy.trader.constant import Direction, Offset
 from vnpy.trader.ui import QtWidgets, QtCore, QtGui
 from vnpy.trader.ui.widget import (
     BaseMonitor, BaseCell,
@@ -169,10 +169,12 @@ class SpreadAlgoMonitor(BaseMonitor):
         "algoid": {"display": "算法", "cell": BaseCell, "update": False},
         "spread_name": {"display": "价差", "cell": BaseCell, "update": False},
         "direction": {"display": "方向", "cell": DirectionCell, "update": False},
+        "offset": {"display": "开平", "cell": EnumCell, "update": False},
         "price": {"display": "价格", "cell": BaseCell, "update": False},
         "payup": {"display": "超价", "cell": BaseCell, "update": False},
         "volume": {"display": "数量", "cell": BaseCell, "update": False},
-        "traded_volume": {"display": "成交", "cell": BaseCell, "update": True},
+        "traded_volume": {"display": "成交数量", "cell": BaseCell, "update": True},
+        "traded_price": {"display": "成交均价", "cell": BaseCell, "update": True},
         "interval": {"display": "间隔", "cell": BaseCell, "update": False},
         "count": {"display": "计数", "cell": BaseCell, "update": True},
         "status": {"display": "状态", "cell": EnumCell, "update": True},
@@ -226,6 +228,11 @@ class SpreadAlgoWidget(QtWidgets.QFrame):
             [Direction.LONG.value, Direction.SHORT.value]
         )
 
+        self.offset_combo = QtWidgets.QComboBox()
+        self.offset_combo.addItems(
+            [Offset.NONE.value, Offset.OPEN.value, Offset.CLOSE.value]
+        )
+
         float_validator = QtGui.QDoubleValidator()
 
         self.price_line = QtWidgets.QLineEdit()
@@ -267,12 +274,16 @@ class SpreadAlgoWidget(QtWidgets.QFrame):
         add_spread_button = QtWidgets.QPushButton("创建价差")
         add_spread_button.clicked.connect(self.add_spread)
 
+        add_advanced_button = QtWidgets.QPushButton("创建灵活价差")
+        add_advanced_button.clicked.connect(self.add_advanced_spread)
+
         remove_spread_button = QtWidgets.QPushButton("移除价差")
         remove_spread_button.clicked.connect(self.remove_spread)
 
         form = QtWidgets.QFormLayout()
         form.addRow("价差", self.name_line)
         form.addRow("方向", self.direction_combo)
+        form.addRow("开平", self.offset_combo)
         form.addRow("价格", self.price_line)
         form.addRow("数量", self.volume_line)
         form.addRow("超价", self.payup_line)
@@ -290,6 +301,7 @@ class SpreadAlgoWidget(QtWidgets.QFrame):
         vbox.addWidget(stop_button)
         vbox.addStretch()
         vbox.addWidget(add_spread_button)
+        vbox.addWidget(add_advanced_button)
         vbox.addWidget(remove_spread_button)
 
         self.setLayout(vbox)
@@ -298,6 +310,7 @@ class SpreadAlgoWidget(QtWidgets.QFrame):
         """"""
         name = self.name_line.text()
         direction = Direction(self.direction_combo.currentText())
+        offset = Offset(self.offset_combo.currentText())
         price = float(self.price_line.text())
         volume = float(self.volume_line.text())
         payup = int(self.payup_line.text())
@@ -310,12 +323,17 @@ class SpreadAlgoWidget(QtWidgets.QFrame):
             lock = False
 
         self.spread_engine.start_algo(
-            name, direction, price, volume, payup, interval, lock
+            name, direction, offset, price, volume, payup, interval, lock
         )
 
     def add_spread(self):
         """"""
         dialog = SpreadDataDialog(self.spread_engine)
+        dialog.exec_()
+
+    def add_advanced_spread(self):
+        """"""
+        dialog = AdvancedSpreadDataDialog(self.spread_engine)
         dialog.exec_()
 
     def remove_spread(self):
@@ -325,6 +343,7 @@ class SpreadAlgoWidget(QtWidgets.QFrame):
 
     def update_class_combo(self):
         """"""
+        self.class_combo.clear()
         self.class_combo.addItems(
             self.strategy_engine.get_all_strategy_class_names()
         )
@@ -375,6 +394,17 @@ class SpreadDataDialog(QtWidgets.QDialog):
         self.name_line = QtWidgets.QLineEdit()
         self.active_line = QtWidgets.QLineEdit()
 
+        self.min_volume_combo = QtWidgets.QComboBox()
+        self.min_volume_combo.addItems([
+            "1",
+            "0.1",
+            "0.01",
+            "0.001",
+            "0.0001",
+            "0.00001",
+            "0.000001",
+        ])
+
         self.grid = QtWidgets.QGridLayout()
 
         button_add = QtWidgets.QPushButton("创建价差")
@@ -384,41 +414,50 @@ class SpreadDataDialog(QtWidgets.QDialog):
 
         grid = QtWidgets.QGridLayout()
         grid.addWidget(Label("价差名称"), 0, 0)
-        grid.addWidget(self.name_line, 0, 1, 1, 3)
+        grid.addWidget(self.name_line, 0, 1, 1, 4)
         grid.addWidget(Label("主动腿代码"), 1, 0)
-        grid.addWidget(self.active_line, 1, 1, 1, 3)
+        grid.addWidget(self.active_line, 1, 1, 1, 4)
+        grid.addWidget(Label("最小交易量"), 2, 0)
+        grid.addWidget(self.min_volume_combo, 2, 1, 1, 4)
 
-        grid.addWidget(Label(""), 2, 0)
-        grid.addWidget(Label("本地代码"), 3, 1)
-        grid.addWidget(Label("价格乘数"), 3, 2)
-        grid.addWidget(Label("交易乘数"), 3, 3)
+        grid.addWidget(Label(""), 3, 0)
+        grid.addWidget(Label("本地代码"), 4, 1)
+        grid.addWidget(Label("价格乘数"), 4, 2)
+        grid.addWidget(Label("交易乘数"), 4, 3)
+        grid.addWidget(Label("合约模式"), 4, 4)
 
         int_validator = QtGui.QIntValidator()
+        double_validator = QtGui.QDoubleValidator()
 
         leg_count = 5
         for i in range(leg_count):
             symbol_line = QtWidgets.QLineEdit()
 
             price_line = QtWidgets.QLineEdit()
-            price_line.setValidator(int_validator)
+            price_line.setValidator(double_validator)
 
             trading_line = QtWidgets.QLineEdit()
             trading_line.setValidator(int_validator)
 
-            grid.addWidget(Label("腿{}".format(i + 1)), 4 + i, 0)
-            grid.addWidget(symbol_line, 4 + i, 1)
-            grid.addWidget(price_line, 4 + i, 2)
-            grid.addWidget(trading_line, 4 + i, 3)
+            inverse_combo = QtWidgets.QComboBox()
+            inverse_combo.addItems(["正向", "反向"])
+
+            grid.addWidget(Label("腿{}".format(i + 1)), 5 + i, 0)
+            grid.addWidget(symbol_line, 5 + i, 1)
+            grid.addWidget(price_line, 5 + i, 2)
+            grid.addWidget(trading_line, 5 + i, 3)
+            grid.addWidget(inverse_combo, 5 + i, 4)
 
             d = {
                 "symbol": symbol_line,
                 "price": price_line,
-                "trading": trading_line
+                "trading": trading_line,
+                "inverse": inverse_combo
             }
             self.leg_widgets.append(d)
 
-        grid.addWidget(Label(""), 4 + leg_count, 0,)
-        grid.addWidget(button_add, 5 + leg_count, 0, 1, 4)
+        grid.addWidget(Label(""), 5 + leg_count, 0,)
+        grid.addWidget(button_add, 6 + leg_count, 0, 1, 5)
 
         self.setLayout(grid)
 
@@ -435,6 +474,7 @@ class SpreadDataDialog(QtWidgets.QDialog):
             return
 
         active_symbol = self.active_line.text()
+        min_volume = float(self.min_volume_combo.currentText())
 
         leg_settings = {}
         for d in self.leg_widgets:
@@ -443,10 +483,16 @@ class SpreadDataDialog(QtWidgets.QDialog):
                 price_multiplier = int(d["price"].text())
                 trading_multiplier = int(d["trading"].text())
 
+                if d["inverse"].currentText() == "正向":
+                    inverse_contract = False
+                else:
+                    inverse_contract = True
+
                 leg_settings[vt_symbol] = {
                     "vt_symbol": vt_symbol,
                     "price_multiplier": price_multiplier,
-                    "trading_multiplier": trading_multiplier
+                    "trading_multiplier": trading_multiplier,
+                    "inverse_contract": inverse_contract
                 }
             except ValueError:
                 pass
@@ -472,7 +518,8 @@ class SpreadDataDialog(QtWidgets.QDialog):
         self.spread_engine.add_spread(
             spread_name,
             list(leg_settings.values()),
-            active_symbol
+            active_symbol,
+            min_volume
         )
         self.accept()
 
@@ -808,3 +855,185 @@ class SettingEditor(QtWidgets.QDialog):
             setting[name] = value
 
         return setting
+
+
+class AdvancedSpreadDataDialog(QtWidgets.QDialog):
+    """"""
+
+    def __init__(self, spread_engine: SpreadEngine):
+        """"""
+        super().__init__()
+
+        self.spread_engine: SpreadEngine = spread_engine
+
+        self.leg_widgets = []
+
+        self.init_ui()
+
+    def init_ui(self):
+        """"""
+        self.setWindowTitle("创建价差")
+
+        self.name_line = QtWidgets.QLineEdit()
+        self.active_line = QtWidgets.QLineEdit()
+
+        self.min_volume_combo = QtWidgets.QComboBox()
+        self.min_volume_combo.addItems([
+            "1",
+            "0.1",
+            "0.01",
+            "0.001",
+            "0.0001",
+            "0.00001",
+            "0.000001",
+        ])
+
+        self.formula_line = QtWidgets.QLineEdit()
+
+        self.grid = QtWidgets.QGridLayout()
+
+        button_add = QtWidgets.QPushButton("创建价差")
+        button_add.clicked.connect(self.add_spread)
+
+        Label = QtWidgets.QLabel
+
+        grid = QtWidgets.QGridLayout()
+        grid.addWidget(Label("价差名称"), 0, 0)
+        grid.addWidget(self.name_line, 0, 1, 1, 4)
+        grid.addWidget(Label("主动腿代码"), 1, 0)
+        grid.addWidget(self.active_line, 1, 1, 1, 4)
+        grid.addWidget(Label("最小交易量"), 2, 0)
+        grid.addWidget(self.min_volume_combo, 2, 1, 1, 4)
+        grid.addWidget(Label("价格公式"), 3, 0)
+        grid.addWidget(self.formula_line, 3, 1, 1, 4)
+
+        grid.addWidget(Label("合约代码"), 4, 1)
+        grid.addWidget(Label("交易方向"), 4, 2)
+        grid.addWidget(Label("交易乘数"), 4, 3)
+        grid.addWidget(Label("合约模式"), 4, 4)
+
+        int_validator = QtGui.QIntValidator()
+        int_validator.setBottom(0)
+
+        leg_count = 5
+        variables = ["A", "B", "C", "D", "E"]
+        for i, variable in enumerate(variables):
+            symbol_line = QtWidgets.QLineEdit()
+
+            direction_combo = QtWidgets.QComboBox()
+            direction_combo.addItems(["买入", "卖出"])
+
+            trading_line = QtWidgets.QLineEdit()
+            trading_line.setValidator(int_validator)
+
+            inverse_combo = QtWidgets.QComboBox()
+            inverse_combo.addItems(["正向", "反向"])
+
+            grid.addWidget(Label(variable), 5 + i, 0)
+            grid.addWidget(symbol_line, 5 + i, 1)
+            grid.addWidget(direction_combo, 5 + i, 2)
+            grid.addWidget(trading_line, 5 + i, 3)
+            grid.addWidget(inverse_combo, 5 + i, 4)
+
+            d = {
+                "variable": variable,
+                "symbol": symbol_line,
+                "direction": direction_combo,
+                "trading": trading_line,
+                "inverse": inverse_combo
+            }
+            self.leg_widgets.append(d)
+
+        grid.addWidget(Label(""), 5 + leg_count, 0,)
+        grid.addWidget(button_add, 6 + leg_count, 0, 1, 5)
+
+        self.setLayout(grid)
+
+    def add_spread(self):
+        """"""
+        spread_name = self.name_line.text()
+        if not spread_name:
+            QtWidgets.QMessageBox.warning(
+                self,
+                "创建失败",
+                "请输入价差名称",
+                QtWidgets.QMessageBox.Ok
+            )
+            return
+
+        price_formula = self.formula_line.text()
+        if not self.check_formula(price_formula):
+            QtWidgets.QMessageBox.warning(
+                self,
+                "创建失败",
+                "请输入正确的计算公式",
+                QtWidgets.QMessageBox.Ok
+            )
+            return
+
+        active_symbol = self.active_line.text()
+        min_volume = float(self.min_volume_combo.currentText())
+
+        leg_settings = {}
+        for d in self.leg_widgets:
+            try:
+                vt_symbol = d["symbol"].text()
+                trading_multiplier = int(d["trading"].text())
+
+                if d["direction"].currentText() == "买入":
+                    trading_direction = 1
+                else:
+                    trading_direction = -1
+                trading_multiplier = trading_multiplier * trading_direction
+
+                if d["inverse"].currentText() == "正向":
+                    inverse_contract = False
+                else:
+                    inverse_contract = True
+
+                leg_settings[vt_symbol] = {
+                    "variable": d["variable"],
+                    "vt_symbol": vt_symbol,
+                    "trading_direction": trading_direction,
+                    "trading_multiplier": trading_multiplier,
+                    "inverse_contract": inverse_contract
+                }
+            except ValueError:
+                pass
+
+        if len(leg_settings) < 2:
+            QtWidgets.QMessageBox.warning(
+                self,
+                "创建失败",
+                "价差最少需要2条腿",
+                QtWidgets.QMessageBox.Ok
+            )
+            return
+
+        if active_symbol not in leg_settings:
+            QtWidgets.QMessageBox.warning(
+                self,
+                "创建失败",
+                "各条腿中找不到主动腿代码",
+                QtWidgets.QMessageBox.Ok
+            )
+            return
+
+        self.spread_engine.add_advanced_spread(
+            spread_name,
+            list(leg_settings.values()),
+            price_formula,
+            active_symbol,
+            min_volume
+        )
+        self.accept()
+
+    def check_formula(self, formula: str):
+        """"""
+        data = {variable: 1 for variable in "ABCDE"}
+        locals().update(data)
+        try:
+            result = eval(formula)
+            return True
+        except Exception:
+            return False

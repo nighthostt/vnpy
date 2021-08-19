@@ -1,12 +1,9 @@
 """
 vn.py - By Traders, For Traders.
-
 The vn.py project is an open-source quantitative trading framework
 that is developed by traders, for traders.
-
 The project is mainly written in Python and uses C++ for low-layer
 and performance sensitive infrastructure.
-
 Using the vn.py project, institutional investors and professional
 traders, such as hedge funds, prop trading firms and investment banks,
 can easily develop complex trading strategies with the Event Engine
@@ -43,7 +40,8 @@ def check_extension_build_flag(ext_modules, key: str, module: Extension):
         elif value == '0':
             ext_modules = list(set(ext_modules) - {module})
         else:
-            raise ValueError(f"Flag {key} should be '0' or '1', but {repr(value)} got.")
+            raise ValueError(
+                f"Flag {key} should be '0' or '1', but {repr(value)} got.")
     return ext_modules
 
 
@@ -62,18 +60,15 @@ def get_install_requires():
         "requests",
         "websocket-client",
         "peewee",
-        "pymysql",
-        "mongoengine",
         "numpy",
         "pandas",
         "matplotlib",
         "seaborn",
-        "futu-api",
-        "tigeropen",
         "rqdatac",
         "ta-lib",
-        "ibapi",
-        "deap"
+        "deap",
+        "pyzmq",
+        "QScintilla"
     ]
     if not is_psycopg2_exists():
         install_requires.append("psycopg2-binary")
@@ -112,80 +107,144 @@ def get_ext_modules():
         ]
         extra_link_args = ["-lstdc++"]
         runtime_library_dirs = ["$ORIGIN"]
-    vnctpmd = Extension(
-        "vnpy.api.ctp.vnctpmd",
+
+    vnksgoldmd = Extension(
+        "vnpy.api.ksgold.vnksgoldmd",
         [
-            "vnpy/api/ctp/vnctp/vnctpmd/vnctpmd.cpp",
+            "vnpy/api/ksgold/vnksgold/vnksgoldmd/vnksgoldmd.cpp",
         ],
-        include_dirs=["vnpy/api/ctp/include",
-                      "vnpy/api/ctp/vnctp", ],
+        include_dirs=["vnpy/api/ksgold/include",
+                      "vnpy/api/ksgold/vnksgold"],
         define_macros=[],
         undef_macros=[],
-        library_dirs=["vnpy/api/ctp/libs", "vnpy/api/ctp"],
-        libraries=["thostmduserapi_se", "thosttraderapi_se", ],
+        library_dirs=["vnpy/api/ksgold/libs", "vnpy/api/ksgold"],
+        libraries=["ksgoldquotmarketdataapi", "ksgoldtraderapi"],
         extra_compile_args=compiler_flags,
         extra_link_args=extra_link_args,
         runtime_library_dirs=runtime_library_dirs,
         depends=[],
         language="cpp",
     )
-    vnctptd = Extension(
-        "vnpy.api.ctp.vnctptd",
+
+    vnksgoldtd = Extension(
+        "vnpy.api.ksgold.vnksgoldtd",
         [
-            "vnpy/api/ctp/vnctp/vnctptd/vnctptd.cpp",
+            "vnpy/api/ksgold/vnksgold/vnksgoldtd/vnksgoldtd.cpp",
         ],
-        include_dirs=["vnpy/api/ctp/include",
-                      "vnpy/api/ctp/vnctp", ],
+        include_dirs=["vnpy/api/ksgold/include",
+                      "vnpy/api/ksgold/vnksgold"],
         define_macros=[],
         undef_macros=[],
-        library_dirs=["vnpy/api/ctp/libs", "vnpy/api/ctp"],
-        libraries=["thostmduserapi_se", "thosttraderapi_se", ],
+        library_dirs=["vnpy/api/ksgold/libs", "vnpy/api/ksgold"],
+        libraries=["ksgoldquotmarketdataapi", "ksgoldtraderapi"],
         extra_compile_args=compiler_flags,
         extra_link_args=extra_link_args,
         runtime_library_dirs=runtime_library_dirs,
         depends=[],
         language="cpp",
     )
-    vnoes = Extension(
-        name="vnpy.api.oes.vnoes",
-        sources=gather_autocxxpy_generated_files(
-            "vnpy/api/oes/vnoes/generated_files/",
-        ),
-        include_dirs=["vnpy/api/oes/vnoes/include",
-                      "vnpy/api/oes/vnoes/include/oes", ],
-        define_macros=[("BRIGAND_NO_BOOST_SUPPORT", "1")],
+
+    vnsgitmd = Extension(
+        "vnpy.api.sgit.vnsgitmd",
+        [
+            "vnpy/api/sgit/vnsgit/vnsgitmd/vnsgitmd.cpp",
+        ],
+        include_dirs=["vnpy/api/sgit/include",
+                      "vnpy/api/sgit/vnsgit"],
+        define_macros=[],
         undef_macros=[],
-        library_dirs=["vnpy/api/oes/vnoes/libs"],
-        libraries=["oes_api"],
+        library_dirs=["vnpy/api/sgit/libs", "vnpy/api/sgit"],
+        libraries=["crypto", "sgitquotapi", "sgittradeapi", "ssl"],
         extra_compile_args=compiler_flags,
         extra_link_args=extra_link_args,
         runtime_library_dirs=runtime_library_dirs,
         depends=[],
         language="cpp",
     )
+
+    vnsgittd = Extension(
+        "vnpy.api.sgit.vnsgittd",
+        [
+            "vnpy/api/sgit/vnsgit/vnsgittd/vnsgittd.cpp",
+        ],
+        include_dirs=["vnpy/api/sgit/include",
+                      "vnpy/api/sgit/vnsgit"],
+        define_macros=[],
+        undef_macros=[],
+        library_dirs=["vnpy/api/sgit/libs", "vnpy/api/sgit"],
+        libraries=["crypto", "sgitquotapi", "sgittradeapi", "ssl"],
+        extra_compile_args=compiler_flags,
+        extra_link_args=extra_link_args,
+        runtime_library_dirs=runtime_library_dirs,
+        depends=[],
+        language="cpp",
+    )
+
+    vnnhmd = Extension(
+        "vnpy.api.nh.vnnhmd",
+        [
+            "vnpy/api/nh/vnnh/vnnhmd/vnnhmd.cpp",
+        ],
+        include_dirs=["vnpy/api/nh/include", "vnpy/api/nh/vnnh"],
+        library_dirs=["vnpy/api/nh/libs", "vnpy/api/nh"],
+        libraries=["nhmdapi"],
+        extra_compile_args=compiler_flags,
+        extra_link_args=extra_link_args,
+        runtime_library_dirs=runtime_library_dirs,
+        language="cpp",
+    )
+
+    vnnhfutures = Extension(
+        "vnpy.api.nh.vnnhfutures",
+        [
+            "vnpy/api/nh/vnnh/vnnhfutures/vnnhfutures.cpp",
+        ],
+        include_dirs=["vnpy/api/nh/include", "vnpy/api/nh/vnnh"],
+        library_dirs=["vnpy/api/nh/libs", "vnpy/api/nh"],
+        libraries=["nhtd2traderapi"],
+        extra_compile_args=compiler_flags,
+        extra_link_args=extra_link_args,
+        runtime_library_dirs=runtime_library_dirs,
+        language="cpp",
+    )
+
+    vnnhstock = Extension(
+        "vnpy.api.nh.vnnhstock",
+        [
+            "vnpy/api/nh/vnnh/vnnhstock/vnnhstock.cpp",
+        ],
+        include_dirs=["vnpy/api/nh/include", "vnpy/api/nh/vnnh"],
+        library_dirs=["vnpy/api/nh/libs", "vnpy/api/nh"],
+        libraries=["nhtdstockapi"],
+        extra_compile_args=compiler_flags,
+        extra_link_args=extra_link_args,
+        runtime_library_dirs=runtime_library_dirs,
+        language="cpp",
+    )
+
     if platform.system() == "Windows":
         # use pre-built pyd for windows ( support python 3.7 only )
         ext_modules = []
     elif platform.system() == "Darwin":
         ext_modules = []
     else:
-        ext_modules = [vnctptd, vnctpmd, vnoes]
+        ext_modules = [
+            vnsgittd, vnsgitmd,
+            vnksgoldmd, vnksgoldtd,
+            vnnhmd, vnnhfutures, vnnhstock
+        ]
 
-    ext_modules = check_extension_build_flag(ext_modules, "VNPY_BUILD_OES", vnoes)
-    ext_modules = check_extension_build_flag(ext_modules, "VNPY_BUILD_CTP", vnctptd)
-    ext_modules = check_extension_build_flag(ext_modules, "VNPY_BUILD_CTP", vnctpmd)
+    ext_modules = check_extension_build_flag(
+        ext_modules, "VNPY_BUILD_sgit", vnsgittd)
+    ext_modules = check_extension_build_flag(
+        ext_modules, "VNPY_BUILD_sgit", vnsgitmd)
+    ext_modules = check_extension_build_flag(
+        ext_modules, "VNPY_BUILD_ksgold", vnksgoldmd)
+    ext_modules = check_extension_build_flag(
+        ext_modules, "VNPY_BUILD_ksgold", vnksgoldtd)
 
     return ext_modules
 
-
-parallel = os.environ.get('VNPY_BUILD_PARALLEL', None)
-if parallel:
-    if parallel == 'auto':
-        parallel = os.cpu_count()
-    if parallel != 'no':
-        from ci.parallel_build_distutils import patch_distutils
-
-        patch_distutils(int(parallel))
 
 setup(
     name="vnpy",
@@ -214,14 +273,13 @@ setup(
         "Operating System :: Microsoft :: Windows :: Windows 10",
         "Operating System :: Microsoft :: Windows :: Windows Server 2008",
         "Operating System :: Microsoft :: Windows :: Windows Server 2012",
-        "Operating System :: Microsoft :: Windows :: Windows Server 2012",
+        "Operating System :: Microsoft :: Windows :: Windows Server 2019",
         "Operating System :: POSIX :: Linux"
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.7",
         "Topic :: Office/Business :: Financial :: Investment",
         "Programming Language :: Python :: Implementation :: CPython",
         "License :: OSI Approved :: MIT License",
-        "Natural Language :: Chinese (Simplified)",
         "Natural Language :: Chinese (Simplified)"
     ],
     ext_modules=get_ext_modules(),
