@@ -3,7 +3,7 @@ from itertools import product
 from concurrent.futures import ProcessPoolExecutor
 from random import random, choice
 from time import perf_counter
-from multiprocessing import Manager, Pool
+from multiprocessing import Manager, Pool, get_context
 
 from deap import creator, base, tools, algorithms
 
@@ -101,12 +101,15 @@ def run_bf_optimization(
     """Run brutal force optimization"""
     settings: List[Dict] = optimization_setting.generate_settings()
 
-    output(f"开始执行穷举算法优化")
+    output("开始执行穷举算法优化")
     output(f"参数优化空间：{len(settings)}")
 
     start: int = perf_counter()
 
-    with ProcessPoolExecutor(max_workers) as executor:
+    with ProcessPoolExecutor(
+        max_workers,
+        mp_context=get_context("spawn")
+    ) as executor:
         results: List[Tuple] = list(executor.map(evaluate_func, settings))
         results.sort(reverse=True, key=key_func)
 
@@ -177,7 +180,7 @@ def run_ga_optimization(
         pop: list = toolbox.population(pop_size)
 
         # Run ga optimization
-        output(f"开始执行遗传算法优化")
+        output("开始执行遗传算法优化")
         output(f"参数优化空间：{total_size}")
         output(f"每代族群总数：{pop_size}")
         output(f"优良筛选个数：{mu}")

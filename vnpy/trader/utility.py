@@ -167,7 +167,7 @@ class BarGenerator:
     """
     For:
     1. generating 1 minute bar data from tick data
-    2. generateing x minute bar/x hour bar data from 1 minute data
+    2. generating x minute bar/x hour bar data from 1 minute data
 
     Notice:
     1. for x minute bar, x must be able to divide 60: 2, 3, 5, 6, 10, 15, 20, 30
@@ -316,8 +316,10 @@ class BarGenerator:
                 open_price=bar.open_price,
                 high_price=bar.high_price,
                 low_price=bar.low_price,
+                close_price=bar.close_price,
                 volume=bar.volume,
-                turnover=bar.turnover
+                turnover=bar.turnover,
+                open_interest=bar.open_interest
             )
             return
 
@@ -357,7 +359,8 @@ class BarGenerator:
                 low_price=bar.low_price,
                 close_price=bar.close_price,
                 volume=bar.volume,
-                turnover=bar.turnover
+                turnover=bar.turnover,
+                open_interest=bar.open_interest
             )
         # Otherwise only update minute bar
         else:
@@ -948,6 +951,35 @@ class ArrayManager(object):
         if array:
             return result
         return result[-1]
+
+    def stoch(
+        self,
+        fastk_period: int,
+        slowk_period: int,
+        slowk_matype: int,
+        slowd_period: int,
+        slowd_matype: int,
+        array: bool = False
+    ) -> Union[
+        Tuple[float, float],
+        Tuple[np.ndarray, np.ndarray]
+    ]:
+        """
+        Stochastic Indicator
+        """
+        k, d = talib.STOCH(
+            self.high,
+            self.low,
+            self.close,
+            fastk_period,
+            slowk_period,
+            slowk_matype,
+            slowd_period,
+            slowd_matype
+        )
+        if array:
+            return k, d
+        return k[-1], d[-1]
 
 
 def virtual(func: Callable) -> Callable:
