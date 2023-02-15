@@ -4,6 +4,7 @@ import sys
 import traceback
 import webbrowser
 import types
+import threading
 
 import qdarkstyle
 from PySide6 import QtGui, QtWidgets, QtCore
@@ -24,15 +25,15 @@ def create_qapp(app_name: str = "VeighNa Trader") -> QtWidgets.QApplication:
     Create Qt Application.
     """
     # Set up dark stylesheet
-    qapp = QtWidgets.QApplication(sys.argv)
+    qapp: QtWidgets.QApplication = QtWidgets.QApplication(sys.argv)
     qapp.setStyleSheet(qdarkstyle.load_stylesheet(qt_api="pyside6"))
 
     # Set up font
-    font = QtGui.QFont(SETTINGS["font.family"], SETTINGS["font.size"])
+    font: QtGui.QFont = QtGui.QFont(SETTINGS["font.family"], SETTINGS["font.size"])
     qapp.setFont(font)
 
     # Set up icon
-    icon = QtGui.QIcon(get_icon_path(__file__, "vnpy.ico"))
+    icon: QtGui.QIcon = QtGui.QIcon(get_icon_path(__file__, "vnpy.ico"))
     qapp.setWindowIcon(icon)
 
     # Set up windows process ID
@@ -51,19 +52,29 @@ def create_qapp(app_name: str = "VeighNa Trader") -> QtWidgets.QApplication:
         """Show exception detail with QMessageBox."""
         sys.__excepthook__(exctype, value, tb)
 
-        msg = "".join(traceback.format_exception(exctype, value, tb))
+        msg: str = "".join(traceback.format_exception(exctype, value, tb))
         exception_widget.signal.emit(msg)
 
     sys.excepthook = excepthook
+
+    if sys.version_info >= (3, 8):
+        def threading_excepthook(args: threading.ExceptHookArgs, extra: object) -> None:
+            """Show exception detail from background threads with QMessageBox."""
+            sys.__excepthook__(args.exc_type, args.exc_value, args.exc_traceback)
+
+            msg: str = "".join(traceback.format_exception(args.exc_type, args.exc_value, args.exc_traceback))
+            exception_widget.signal.emit(msg)
+
+        threading.excepthook = threading_excepthook
 
     return qapp
 
 
 class ExceptionWidget(QtWidgets.QWidget):
     """"""
-    signal = QtCore.pyqtSignal(str)
+    signal: QtCore.Signal = QtCore.Signal(str)
 
-    def __init__(self, parent: QtWidgets.QWidget = None):
+    def __init__(self, parent: QtWidgets.QWidget = None) -> None:
         """"""
         super().__init__(parent)
 
@@ -75,24 +86,24 @@ class ExceptionWidget(QtWidgets.QWidget):
         self.setWindowTitle("触发异常")
         self.setFixedSize(600, 600)
 
-        self.msg_edit = QtWidgets.QTextEdit()
+        self.msg_edit: QtWidgets.QTextEdit = QtWidgets.QTextEdit()
         self.msg_edit.setReadOnly(True)
 
-        copy_button = QtWidgets.QPushButton("复制")
+        copy_button: QtWidgets.QPushButton = QtWidgets.QPushButton("复制")
         copy_button.clicked.connect(self._copy_text)
 
-        community_button = QtWidgets.QPushButton("求助")
+        community_button: QtWidgets.QPushButton = QtWidgets.QPushButton("求助")
         community_button.clicked.connect(self._open_community)
 
-        close_button = QtWidgets.QPushButton("关闭")
+        close_button: QtWidgets.QPushButton = QtWidgets.QPushButton("关闭")
         close_button.clicked.connect(self.close)
 
-        hbox = QtWidgets.QHBoxLayout()
+        hbox: QtWidgets.QHBoxLayout = QtWidgets.QHBoxLayout()
         hbox.addWidget(copy_button)
         hbox.addWidget(community_button)
         hbox.addWidget(close_button)
 
-        vbox = QtWidgets.QVBoxLayout()
+        vbox: QtWidgets.QVBoxLayout = QtWidgets.QVBoxLayout()
         vbox.addWidget(self.msg_edit)
         vbox.addLayout(hbox)
 
